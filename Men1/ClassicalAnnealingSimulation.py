@@ -3,7 +3,7 @@ import math
 
 
 
-def sample_once(Q, num_iter, T0):
+def sample_once(Q, num_iter, t_to_t):
     keys = list(Q.keys())
     nodes = []
     for key in keys:
@@ -28,7 +28,7 @@ def sample_once(Q, num_iter, T0):
         position[node] = curr
     # побежали. Бежим num_iter*количество узлов
     for i in range(num_iter):
-        position = consistent_change(nodes, Q, position, (T0/(i+1)))
+        position = consistent_change(nodes, Q, position, (t_to_t(i)))
     # расчитываем энергию и добавляем её
     f_en = full_energy(nodes, Q, position)
     position["energy"] = f_en

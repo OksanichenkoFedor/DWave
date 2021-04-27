@@ -3,20 +3,23 @@ import pandas as pd
 from Men1.ClassicalAnnealingSimulation import *
 
 N_levels = 10 # Количество состояний, выводимых при выводе sampleSet
+N_levels_comparing = 5;
 
-def creating_QUBO(X,y,lambbda):
+def creating_QUBO(X_curr,y_curr,lambbda):
     Q = {}
-    G = np.zeros((len(y), len(y)))
-    k = np.ones((len(y),))*lambbda
-    for i in range(len(y)):
-        k -= 2*y[i]*X[i]
-        G += np.dot((X[i]).reshape(len(y), 1), (X[i]).reshape(1, len(y)))
+    G = np.zeros((X_curr.shape[1], X_curr.shape[1]))
+    k = np.ones(X_curr.shape[1], )*lambbda
+    print(k.shape)
+    X_1 = X_curr
+    for i in range(y_curr.shape[0]):
+        k -= 2.0*y_curr[i]*(X_curr[i])
+        G += np.dot((X_1[i]).reshape(X_1.shape[1],1), (X_1[i]).reshape(1, X_1.shape[1]))
     #print(k)
     #print(G)
-    for i in range(len(y)):
+    for i in range(X_curr.shape[1]):
         name_1 = 'x' + str(i+1)
         Q[(name_1, name_1)] = G[i, i]+k[i]
-        for j in range(i+1, len(y)):
+        for j in range(i+1, X_curr.shape[1]):
             name_2 = 'x' + str(j+1)
             Q[(name_1, name_2)] = G[i, j] + G[j, i]
     return Q
@@ -28,25 +31,25 @@ def binominalization_0001(X):
     # 0100 - G
     # 1000 - T
     X_b = []
-    for i in range(X.shape[0]):
+    for i in range(len(X)):
         X_b.append([])
-        for j in range(X.shape[1]):
-            if X[i, j] == "A":
+        for j in range(len(X[i])):
+            if X[i][j] == "A":
                 X_b[i].append(0)
                 X_b[i].append(0)
                 X_b[i].append(0)
                 X_b[i].append(1)
-            elif X[i, j] == "C":
+            elif X[i][j] == "C":
                 X_b[i].append(0)
                 X_b[i].append(0)
                 X_b[i].append(1)
                 X_b[i].append(0)
-            elif X[i, j] == "G":
+            elif X[i][j] == "G":
                 X_b[i].append(0)
                 X_b[i].append(1)
                 X_b[i].append(0)
                 X_b[i].append(0)
-            elif X[i, j] == "T":
+            elif X[i][j] == "T":
                 X_b[i].append(1)
                 X_b[i].append(0)
                 X_b[i].append(0)
@@ -59,24 +62,27 @@ def binominalization_01(X):
     # 01 - C
     # 10 - G
     # 11 - T
-    num = X.shape[0]
     X_b = []
-    for i in range(X.shape[0]):
+    for i in range(len(X)):
         X_b.append([])
-        for j in range(X.shape[1]):
-            if X[i, j] == "A":
+        for j in range(len(X[i])):
+            if X[i][j] == "A":
                 X_b[i].append(0)
                 X_b[i].append(0)
-            elif X[i, j] == "C":
+            elif X[i][j] == "C":
                 X_b[i].append(0)
                 X_b[i].append(1)
-            elif X[i, j] == "G":
+            elif X[i][j] == "G":
                 X_b[i].append(1)
                 X_b[i].append(0)
-            elif X[i, j] == "T":
+            elif X[i][j] == "T":
                 X_b[i].append(1)
                 X_b[i].append(1)
     return np.array(X_b)
+
+
+def Temp_by_time(time):
+    return 100.0 / (1.0*time+1.0)
 
 
 class samplerSA:
@@ -100,12 +106,16 @@ class samplerSA:
 
         num_res = []
         for i in range(num_reads):
-            new_res = sample_once(Q, num_iter,T0)
+            print("Запуск номер " + str(i + 1))
+            new_res = sample_once(Q, num_iter, lambda t: Temp_by_time(t))
+            if(i%10==9):
+                print("Запуск номер "+str(i+1))
+
             un_found = True
-            for i in range(len(num_res)):
-                if comparator(results[i], new_res):
+            for j in range(len(num_res)):
+                if comparator(results[j], new_res):
                     un_found = False
-                    num_res[i] += 1
+                    num_res[j] += 1
             if un_found:
                 num_res.append(1)
                 results.append(new_res)
@@ -143,6 +153,8 @@ class sampleSet:
             self.head += " " + self.columns[i]
             a += 1 + len(self.columns[i])
             self.col_coords.append(a)
+        self.w = self.data.to_numpy()
+        self.w = (((self.w).T)[:3]).T
 
     def __str__(self):
         our_str = "";
@@ -157,21 +169,13 @@ class sampleSet:
             our_str+=line+"\n"
         return our_str
 
-# проверка симуляции классического отжига
 
-Q = {('x1', 'x2'): 1, ('x1', 'z'): -2, ('x2', 'z'): -2, ('z', 'z'): 3}
-sampler = samplerSA()
-samplset = sampler.sample_qubo(Q, num_reads=5000)
-print(samplset)
-
-# проверка генерации QUBO
-
-X = np.array([[1, 1, 0], [1, 0, 0], [0,1,3]])
-y = np.array([5, 3, 4])
-creating_QUBO(X, y, 1)
-
-# проверка биноминализации данных
-
-X = np.array([["A", "C", "T"], ["A", "G", "C"],["C", "G", "T"]])
-print(binominalization_0001(X))
-print(binominalization_01(X))
+    def predict(self, X):
+        y = [];
+        for i in range(X.shape[0]):
+            curr = 0.0
+            for j in range(N_levels_comparing):
+                curr += 1.0*np.dot(self.w[j], (X[i]).T)/(1.0*N_levels_comparing)
+            y.append(curr)
+        y = np.array(y)
+        return y
