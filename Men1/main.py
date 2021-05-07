@@ -5,17 +5,41 @@ from Men1.ClassicalAnnealingSimulation import *
 N_levels = 10 # Количество состояний, выводимых при выводе sampleSet
 N_levels_comparing = 5;
 
+def creating_QUBO_simple(X_curr,y_curr,lambbda):
+    Q = {}
+    G = np.zeros((X_curr.shape[1], X_curr.shape[1]))
+    k = np.ones(X_curr.shape[1], )*lambbda
+    X_1 = X_curr
+    for i in range(X_curr.shape[1]):
+        curr = lambbda
+        for j in range(X_curr.shape[0]):
+            curr-=y_curr[j]*X_curr[j][i]
+        k[i] = 2*curr
+    for i in range(X_curr.shape[1]):
+        for j in range(X_curr.shape[1]):
+            curr = 0
+            for l in range(X_curr.shape[0]):
+                curr += X_curr[l][i]*X_curr[l][j]
+            G[i][j] = curr
+
+    for i in range(X_curr.shape[1]):
+        name_1 = 'x' + str(i+1)
+        Q[(name_1, name_1)] = G[i, i]+k[i]
+        for j in range(i+1, X_curr.shape[1]):
+            name_2 = 'x' + str(j+1)
+            Q[(name_1, name_2)] = G[i, j] + G[j, i]
+    return Q
+
+
 def creating_QUBO(X_curr,y_curr,lambbda):
     Q = {}
     G = np.zeros((X_curr.shape[1], X_curr.shape[1]))
     k = np.ones(X_curr.shape[1], )*lambbda
-    print(k.shape)
-    X_1 = X_curr
-    for i in range(y_curr.shape[0]):
-        k -= 2.0*y_curr[i]*(X_curr[i])
-        G += np.dot((X_1[i]).reshape(X_1.shape[1],1), (X_1[i]).reshape(1, X_1.shape[1]))
-    #print(k)
-    #print(G)
+    k = k - 2 * np.dot(y_curr.T, X_curr).T
+
+    for i in range(X_curr.shape[0]):
+        G = G + np.dot((X_curr[i]).reshape((X_curr.shape[1],1)), (X_curr[i]).reshape(1,X_curr.shape[1]))
+
     for i in range(X_curr.shape[1]):
         name_1 = 'x' + str(i+1)
         Q[(name_1, name_1)] = G[i, i]+k[i]
@@ -91,22 +115,33 @@ class samplerSA:
 
     def sample_qubo(self, Q, num_reads = 100, num_iter = 100, T0 = 30):
         results = []
+
         # дополняем матрицу связок до полной (это нужно что бы после избежать костылей)
-        Keys = []
+        Keys0 = []
+        Real_Keys = []
+
         for key in list(Q.keys()):
             Q[(key[1], key[0])] = Q[key]
-            Keys.append(key[0])
-            Keys.append(key[1])
-        for key1 in Keys:
-            for key2 in Keys:
-                if (key1,key2) in list(Q.keys()):
+            Keys0.append(key[0])
+            Keys0.append(key[1])
+        for i in range(len(Keys0)):
+            un_found = True
+            for j in range(len(Real_Keys)):
+                if Real_Keys[j] == Keys0[i]:
+                    un_found = False
+            if un_found:
+                Real_Keys.append(Keys0[i])
+
+        for key1 in Real_Keys:
+            for key2 in Real_Keys:
+                if (key1, key2) in list(Q.keys()):
                     pass
                 else:
                     Q[(key1, key2)] = 0
 
+
         num_res = []
         for i in range(num_reads):
-            print("Запуск номер " + str(i + 1))
             new_res = sample_once(Q, num_iter, lambda t: Temp_by_time(t))
             if(i%10==9):
                 print("Запуск номер "+str(i+1))
@@ -154,7 +189,7 @@ class sampleSet:
             a += 1 + len(self.columns[i])
             self.col_coords.append(a)
         self.w = self.data.to_numpy()
-        self.w = (((self.w).T)[:3]).T
+        self.w = ((self.data.to_numpy().T)[0:-2]).T
 
     def __str__(self):
         our_str = "";
@@ -179,3 +214,14 @@ class sampleSet:
             y.append(curr)
         y = np.array(y)
         return y
+
+
+def predictDW(ss, X):
+    y = []
+    A = ss.data()
+    w = np.zeros((len(list(A)[0][0]),))
+    for i in range(N_levels_comparing):
+        for j in range(len(list(A)[0][0])):
+            w[j] += list(A)[i][0]['x'+str(j+1)]
+    w = w / (1.0*N_levels_comparing)
+    return np.dot(X, (w.reshape((len(list(A)[0][0]), 1))))
